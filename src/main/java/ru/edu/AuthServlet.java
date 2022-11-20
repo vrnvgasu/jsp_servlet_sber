@@ -1,7 +1,8 @@
 package ru.edu;
 
 import java.io.IOException;
-import java.io.Writer;
+import java.util.ArrayList;
+import java.util.List;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -10,20 +11,29 @@ import javax.servlet.http.HttpSession;
 
 public class AuthServlet extends HttpServlet {
 
+	List<UserInfo> userInfos = new ArrayList<>();
+
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException, ServletException {
-		HttpSession session = req.getSession();
-		UserInfo info = (UserInfo) session.getAttribute("userInfo");
+		String path = req.getRequestURI();
 
-		// Если сессии нет, то предлагаем авторизоваться
-		if (info == null) {
-			getServletContext().getRequestDispatcher("/login.jsp").forward(req, resp);
-		} else {
-			// если сессия есть, то выводим данные пользователя
-			// будем считывать параметры из request в jsp объекте
-			req.setAttribute("name", info.getName());
-			req.setAttribute("login", info.getLogin());
-			getServletContext().getRequestDispatcher("/info.jsp").forward(req, resp);
+		if (path.endsWith("/auth")) {
+			HttpSession session = req.getSession();
+			UserInfo info = (UserInfo) session.getAttribute("userInfo");
+
+			// Если сессии нет, то предлагаем авторизоваться
+			if (info == null) {
+				getServletContext().getRequestDispatcher("/login.jsp").forward(req, resp);
+			} else {
+				// если сессия есть, то выводим данные пользователя
+				// будем считывать параметры из request в jsp объекте
+				req.setAttribute("name", info.getName());
+				req.setAttribute("login", info.getLogin());
+				getServletContext().getRequestDispatcher("/info.jsp").forward(req, resp);
+			}
+		} else if (path.endsWith("/auth/all")) {
+			req.setAttribute("usersList", userInfos);
+			getServletContext().getRequestDispatcher("/all.jsp").forward(req, resp);
 		}
 	}
 
@@ -41,6 +51,8 @@ public class AuthServlet extends HttpServlet {
 			// создаем пользователя в сессии
 			HttpSession session = req.getSession();
 			session.setAttribute("userInfo", info);
+
+			userInfos.add(info);
 
 			status = "OK";
 		} else {
