@@ -1,21 +1,22 @@
 package ru.edu;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Base64;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 
 public class AuthServlet extends HttpServlet {
 
 	@Override
 	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-		HttpSession session = req.getSession();
-		UserInfo info = (UserInfo) session.getAttribute("userInfo");
+		Cookie infoCookie = getUserInfoCookie(req);
 
-		// Если сессии нет, то предлагаем авторизоваться
-		if (info == null) {
+		// Если куки нет, то предлагаем авторизоваться
+		if (infoCookie == null) {
 			Writer writer = resp.getWriter();
 			writer.write("<html>");
 			writer.write("<body>");
@@ -29,7 +30,10 @@ public class AuthServlet extends HttpServlet {
 			writer.write("</body>");
 			writer.write("</html>");
 		} else {
-			// если сессия есть, то выводим данные пользователя
+			// если кука есть, то выводим данные пользователя
+			String infoJson = new String(Base64.getDecoder().decode(infoCookie.getValue()));
+			UserInfo info = new ObjectMapper().readValue(infoJson, UserInfo.class);
+
 			Writer writer = resp.getWriter();
 			writer.write("<html>");
 			writer.write("<body>");
@@ -55,21 +59,39 @@ public class AuthServlet extends HttpServlet {
 			String name = req.getParameter("name");
 
 			UserInfo info = new UserInfo(login, name);
+			String infoJson = new ObjectMapper().writeValueAsString(info);
 
-			// создаем пользователя в сессии
-			HttpSession session = req.getSession();
-			session.setAttribute("userInfo", info);
+			// json кодируем в base64, чтобы исключить служебные символы
+			String encodedInfo = Base64.getEncoder().encodeToString(infoJson.getBytes());
+			resp.addCookie(new Cookie("userInfo", encodedInfo));
 
 			Writer writer = resp.getWriter();
 			writer.write("<html><body>OK</html></body>");
 		} else {
-			// удаляем пользователя в сессии
-			HttpSession session = req.getSession();
-			session.removeAttribute("userInfo");
+			// удаляем пользователя в куке
+			Cookie cookie = new Cookie("userInfo", "");
+			// куку удалять нельзя, т.к. она на фронте, но можем ее обновить
+			// и поставить время жизни - 0. Браузер сам ее удалит
+			cookie.setMaxAge(0);
+			resp.addCookie(cookie);
 
 			Writer writer = resp.getWriter();
 			writer.write("<html><body>Deleted  OK</html></body>");
 		}
+	}
+
+	private Cookie getUserInfoCookie(HttpServletRequest request) {
+		if (request.getCookies() == null) {
+			return null;
+		}
+
+		for (Cookie cookie: request.getCookies()) {
+			if (cookie.getName().equals("userInfo")) {
+				return cookie;
+			}
+		}
+
+		return null;
 	}
 
 }
